@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b0e14">
+  <title>Mapa de Aletheia</title>
+
+  <link rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+
+  <link rel="stylesheet" href="style.css">
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <script>
+    if (window.L) {
+      L.Map.addInitHook(function () {
+        const map = this;
+
+        function resizeMarkers() {
+          const zoom = map.getZoom();
+
+          if (!Number.isFinite(zoom)) return;
+
+          const sizes = [16, 20, 30, 45, 58, 70];
+
+          const level = Math.max(
+            0, Math.min(5, Math.round(zoom))
+          );
+
+          const size = sizes[level];
+          const container = map.getContainer();
+
+          container.style.setProperty(
+            '--marker-size', size + 'px'
+          );
+
+          container.style.setProperty(
+            '--marker-anchor', -(size / 2) + 'px'
+          );
+
+          container.style.setProperty(
+            '--tooltip-adjustment', ((42 - size) / 2) + 'px'
+          );
+        }
+
+        map.on('load zoom zoomend', resizeMarkers);
+        resizeMarkers();
+      });
+    }
+  </script>
+
+  <script defer
+    src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <script defer src="config.js"></script>
+  <script defer src="categories.js"></script>
+  <script defer src="script.js?v=cristal-3"></script>
+
+  <style>
+
+    /* TAMANHO DOS MARCADORES */
+
+    #map {
+      --marker-size: 42px;
+      --marker-anchor: -21px;
+      --tooltip-adjustment: 0px;
+    }
+
+    #map .leaflet-marker-icon.aletheia-image-marker {
+      width: var(--marker-size) !important;
+      height: var(--marker-size) !important;
+      margin-left: var(--marker-anchor) !important;
+      margin-top: var(--marker-anchor) !important;
+      object-fit: contain !important;
+      opacity: 1 !important;
+      visibility: visible !important;
+      display: block !important;
+      filter: drop-shadow(0 2px 3px #000b);
+    }
+
+    #map .leaflet-tooltip-top.aletheia-tooltip {
+      margin-top: calc(-6px + var(--tooltip-adjustment));
+    }
+
+    #map .leaflet-popup {
+      margin-bottom: calc(20px - var(--tooltip-adjustment));
+    }
+
+    /* LOCAIS REGISTRADOS */
+
+    .registered-locations {
+      background: #0e141e;
+      border: 1px solid #303e50;
+      border-radius: 7px;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .registered-locations summary {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 11px;
+      cursor: pointer;
+      list-style: none;
+      user-select: none;
+    }
+
+    .registered-locations summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .registered-locations summary:hover {
+      background: #182331;
+    }
+
+    .registered-locations summary h3 {
+      flex: 1;
+      margin: 0;
+      font-size: 12px;
+      font-weight: 650;
+      color: #f8faff;
+    }
+
+    .registered-locations #count {
+      color: #b8e2ff;
+      font-size: 11px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .registered-arrow {
+      color: #b8e2ff;
+      font-size: 19px;
+      line-height: 1;
+      transition: transform .2s;
+    }
+
+    .registered-locations[open] .registered-arrow {
+      transform: rotate(90deg);
+    }
+
+    .registered-locations[open] summary {
+      border-bottom: 1px solid #303e50;
+    }
+
+    .registered-locations .locations {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      padding: 8px;
+      max-height: 260px;
+      overflow-y: auto;
+    }
+
+    .registered-locations .location {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      min-height: 36px;
+      padding: 7px 8px;
+      background: #16202d;
+      border: 1px solid #303e50;
+      border-radius: 6px;
+      text-align: left;
+      color: #f8faff;
+    }
+
+    .registered-locations .location:hover {
+      background: #1d2a39;
+      border-color: #a3cce9;
+    }
+
+    .registered-locations .list-icon {
+      width: 22px;
+      height: 22px;
+      object-fit: contain;
+      flex-shrink: 0;
+    }
+
+    .registered-locations .location-content {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .registered-locations .location-title {
+      font-size: 12px;
+      font-weight: 600;
+      line-height: 1.3;
+      overflow-wrap: anywhere;
+    }
+
+    .registered-locations .location-sub {
+      font-size: 10px;
+      color: #a8b8cc;
+      line-height: 1.2;
+      margin-top: 2px;
+    }
+
+    .registered-locations .location > .muted {
+      font-size: 14px;
+      color: #b8e2ff;
+    }
+
+    .registered-locations .empty {
+      font-size: 11px;
+      padding: 7px;
+    }
+
+    /* ÍCONE AUTOMÁTICO */
+
+    .automatic-icon {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 10px 12px;
+      background: #152535;
+      border: 1px solid #303e50;
+      border-radius: 7px;
+      color: #b8e2ff;
+      font-size: 12px;
+    }
+
+    .automatic-icon-symbol {
+      font-size: 17px;
+    }
+
+    #legacyIcon:has(#iconPreview[hidden]) {
+      display: none;
+    }
+
+    /* PRÉVIA DO ÍCONE DA CATEGORIA */
+
+    .group-icon-preview {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px;
+      border: 1px solid #303e50;
+      border-radius: 7px;
+      background: #0b111b;
+    }
+
+    #groupIconPreview {
+      width: 46px;
+      height: 46px;
+      object-fit: contain;
+      flex-shrink: 0;
+    }
+
+    #groupIconStatus {
+      font-size: 11px;
+      color: #b8e2ff;
+      overflow-wrap: anywhere;
+    }
+
+    /* FOTO OPCIONAL */
+
+    .optional-photo {
+      border: 1px solid #303e50;
+      border-radius: 7px;
+      padding: 11px;
+    }
+
+    .optional-photo summary {
+      cursor: pointer;
+      font-size: 12px;
+      color: #d3deec;
+    }
+
+    .optional-photo[open] summary {
+      margin-bottom: 12px;
+    }
+
+    .optional-photo .upload-row {
+      border: none;
+      padding: 0;
+    }
+
+    .manager-content {
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+    }
+
+  </style>
+</head>
+
+<body>
+
+  <header class="topbar">
+
+    <button id="toggleSidebar" class="icon-btn"
+      aria-label="Abrir ou fechar painel"
+      aria-controls="sidebar"
+      aria-expanded="true">☰</button>
+
+    <div class="brand">
+      <span class="brand-symbol">✧</span>
+
+      <div>
+        <span class="eyebrow">CARTOGRAFIA DOS SEMIDEUSES</span>
+        <h1>Mapa de Aletheia</h1>
+      </div>
+    </div>
+
+    <div class="top-actions">
+      <span id="status" class="status">Iniciando...</span>
+      <button id="share" class="btn subtle">Compartilhar</button>
+    </div>
+
+  </header>
+
+  <main id="workspace" class="workspace">
+
+    <aside id="sidebar" class="sidebar">
+
+      <div class="intro">
+        <span class="eyebrow">EXPLORE O TERRITÓRIO</span>
+        <h2>Pontos de interesse</h2>
+        <p>Descubra, registre e compartilhe os caminhos de Aletheia.</p>
+      </div>
+
+      <button id="add" class="btn primary wide">
+        ＋ Adicionar local
+      </button>
+
+      <div class="search">
+        <label for="search">Buscar local</label>
+
+        <input id="search" type="search"
+          placeholder="Nome, categoria ou descrição..."
+          autocomplete="off">
+      </div>
+
+      <div class="section-heading">
+        <h3>Categorias</h3>
+
+        <div class="inline-actions">
+          <button id="resetFilters" class="text-btn">Todas</button>
+          <button id="clearFilters" class="text-btn">Nenhuma</button>
+        </div>
+      </div>
+
+      <button id="manageCategories" class="btn subtle wide">
+        ⚙ Gerenciar categorias
+      </button>
+
+      <div id="filters" class="filters"></div>
+
+      <details id="registeredLocations" class="registered-locations">
+
+        <summary>
+          <h3>Locais registrados</h3>
+          <span id="count" class="muted">0 / 0</span>
+          <span class="registered-arrow" aria-hidden="true">›</span>
+        </summary>
+
+        <div id="locations" class="locations"></div>
+
+      </details>
+
+      <footer class="sidebar-footer">
+
+        <button id="export" class="text-btn">
+          Exportar backup (JSON)
+        </button>
+
+        <span>MAPA DE ALETHEIA • EDIÇÃO COLABORATIVA</span>
+
+      </footer>
+
+    </aside>
+
+    <section class="map-area">
+
+      <div id="map"></div>
+
+      <div class="map-tools">
+
+        <button id="home" class="btn map-btn">
+          Enquadrar mapa
+        </button>
+
+        <select id="style" aria-label="Estilo do mapa">
+          <option value="satelite">Satélite</option>
+          <option value="atlas">Atlas</option>
+          <option value="grid">Grade</option>
+        </select>
+
+      </div>
+
+      <div id="placement" class="placement" hidden>
+        <span>Clique no mapa para posicionar o local.</span>
+
+        <button id="cancelPlacement" class="btn subtle">
+          Cancelar
+        </button>
+      </div>
+
+      <div id="toast" class="toast" role="status" hidden></div>
+
+      <div class="compass">
+        <span>N</span>
+        <span>✥</span>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- CADASTRO DE LOCAIS -->
+
+  <dialog id="editor" class="editor">
+
+    <form id="editorForm">
+
+      <div class="dialog-heading">
+
+        <div>
+          <span class="eyebrow">REGISTRO DO MAPA</span>
+          <h2 id="editorTitle">Novo local</h2>
+        </div>
+
+        <button id="closeEditor" class="icon-btn"
+          type="button" aria-label="Fechar">×</button>
+
+      </div>
+
+      <label for="name">Nome do local *</label>
+
+      <input id="name" maxlength="100"
+        placeholder="Ex.: Cristal azul" required>
+
+      <label for="mainCategory">Categoria principal</label>
+      <select id="mainCategory" required></select>
+
+      <label for="category">Subcategoria</label>
+      <select id="category" required></select>
+
+      <div id="newCategoryBox" class="new-category" hidden>
+
+        <label for="newCategoryName">
+          Nome da nova subcategoria
+        </label>
+
+        <input id="newCategoryName" maxlength="80"
+          placeholder="Ex.: Cristal raro">
+
+        <p class="muted small">
+          A nova subcategoria aparecerá automaticamente nos filtros.
+        </p>
+
+      </div>
+
+      <div class="automatic-icon">
+        <span class="automatic-icon-symbol">✓</span>
+        <span>O ícone será definido automaticamente pela categoria.</span>
+      </div>
+
+      <input id="iconFile" type="file"
+        accept="image/png,image/jpeg,image/webp" hidden>
+
+      <div id="legacyIcon" class="upload-row">
+
+        <img id="iconPreview" class="icon-preview"
+          alt="Ícone individual antigo" hidden>
+
+        <div>
+
+          <p class="muted small">
+            Este local possui um ícone individual antigo.
+          </p>
+
+          <button id="removeIcon" type="button" class="text-btn">
+            Substituir pelo ícone padrão
+          </button>
+
+        </div>
+      </div>
+
+      <label for="description">Descrição</label>
+
+      <textarea id="description" maxlength="2000" rows="4"
+        placeholder="Informações sobre o local..."></textarea>
+
+      <details class="optional-photo">
+
+        <summary>Adicionar foto do local (opcional)</summary>
+
+        <div class="upload-row">
+
+          <img id="photoPreview" class="photo-preview"
+            alt="Prévia da foto" hidden>
+
+          <div>
+            <label for="photoFile">Foto do local</label>
+
+            <input id="photoFile" type="file"
+              accept="image/png,image/jpeg,image/webp">
+
+            <button id="removePhoto" type="button" class="text-btn">
+              Remover foto
+            </button>
+          </div>
+
+        </div>
+
+      </details>
+
+      <p id="positionLabel" class="muted small"></p>
+      <p id="formError" class="error" role="alert"></p>
+
+      <div class="dialog-actions">
+
+        <button id="delete" class="btn danger"
+          type="button" hidden>Excluir</button>
+
+        <span class="grow"></span>
+
+        <button id="cancelEditor" class="btn subtle"
+          type="button">Cancelar</button>
+
+        <button id="save" class="btn primary"
+          type="submit">Salvar local</button>
+
+      </div>
+
+    </form>
+
+  </dialog>
+
+  <!-- GERENCIAMENTO DE CATEGORIAS -->
+
+  <dialog id="categoryManager" class="editor">
+
+    <div class="manager-content">
+
+      <div class="dialog-heading">
+
+        <div>
+          <span class="eyebrow">ORGANIZAÇÃO DO MAPA</span>
+          <h2>Gerenciar categorias</h2>
+        </div>
+
+        <button id="closeManager" class="icon-btn"
+          aria-label="Fechar">×</button>
+
+      </div>
+
+      <p class="muted">
+        Crie e organize os grupos e recursos de Aletheia.
+      </p>
+
+      <button id="newGroup" class="btn primary wide">
+        ＋ Criar categoria principal
+      </button>
+
+      <label for="managerGroup">Categoria principal</label>
+      <select id="managerGroup"></select>
+
+      <div class="manager-actions">
+
+        <button id="renameGroup" class="btn">
+          Renomear categoria
+        </button>
+
+        <button id="deleteGroup" class="btn danger">
+          Excluir categoria
+        </button>
+
+      </div>
+
+      <label for="groupIcon">Ícone padrão da categoria</label>
+
+      <select id="groupIcon">
+        <option value="templo">Templo</option>
+        <option value="entidade">Entidade</option>
+        <option value="planta">Planta</option>
+        <option value="dungeon">Dungeon</option>
+        <option value="missao">Missão</option>
+        <option value="minerio">Minério</option>
+        <option value="material">Material</option>
+        <option value="mercador">Mercador</option>
+        <option value="cristal">Cristal</option>
+        <option value="outros">Outros / Ilegal</option>
+      </select>
+
+      <div class="group-icon-preview">
+
+        <img id="groupIconPreview"
+          alt="Prévia do ícone" hidden>
+
+        <span id="groupIconStatus" role="status">
+          Selecione um ícone.
+        </span>
+
+      </div>
+
+      <button id="saveGroupIcon" class="btn">
+        Salvar ícone padrão
+      </button>
+
+      <div class="separator"></div>
+
+      <button id="newSubcategory" class="btn primary wide">
+        ＋ Criar subcategoria
+      </button>
+
+      <label for="managerSubcategory">Subcategoria</label>
+      <select id="managerSubcategory"></select>
+
+      <div class="manager-actions">
+
+        <button id="renameSubcategory" class="btn">
+          Renomear
+        </button>
+
+        <button id="deleteSubcategory" class="btn danger">
+          Excluir
+        </button>
+
+      </div>
+
+      <p class="muted small">
+        Subcategorias com marcadores não podem ser excluídas
+        até que os locais sejam transferidos ou removidos.
+      </p>
+
+      <p id="managerError" class="error" role="alert"></p>
+
+    </div>
+
+  </dialog>
+
+  <noscript>
+    Ative o JavaScript para utilizar o Mapa de Aletheia.
+  </noscript>
+
+</body>
+</html>
